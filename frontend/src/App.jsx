@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Shield, Activity, Search, AlertTriangle, Drone } from 'lucide-react';
 
 const API_BASE = "http://localhost:8000";
 
@@ -10,13 +9,17 @@ function App() {
   const [alerts, setAlerts] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // 1. Function to trigger a 'tick' from the agentic backend
   const processTick = async () => {
     try {
+      console.log("Fetching from:", API_BASE);
       const res = await axios.post(`${API_BASE}/process-tick`);
+      console.log("Response:", res.data);
       setTelemetry(res.data.telemetry);
       setCurrentFrame(res.data.frame);
+      setLoading(false);
       
       if (res.data.is_alert) {
         setAlerts(prev => [{
@@ -26,107 +29,101 @@ function App() {
         }, ...prev].slice(0, 5)); // Keep last 5 alerts
       }
     } catch (err) {
-      console.error("Backend offline", err);
+      console.error("Backend error:", err.message);
+      console.error("Full error:", err);
+      setLoading(false);
     }
   };
 
   // 2. Poll the backend every 5 seconds
   useEffect(() => {
+    processTick(); // Load immediately
     const interval = setInterval(processTick, 5000);
     return () => clearInterval(interval);
   }, []);
 
   const handleSearch = async () => {
-    const res = await axios.get(`${API_BASE}/search?query=${searchQuery}`);
-    setSearchResults(res.data.results.documents[0] || []);
+    try {
+      const res = await axios.get(`${API_BASE}/search?query=${searchQuery}`);
+      setSearchResults(res.data.results.documents[0] || []);
+    } catch (err) {
+      console.error("Search error:", err);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-matrix-black text-matrix-green font-mono p-6">
-      {/* Header */}
-      <header className="border-b border-matrix-darkgreen pb-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Shield className="text-matrix-green" /> DRONE_SEC_ANALYST_V1.0
-        </h1>
-        <div className="flex gap-4 text-xs">
-          <span className="animate-pulse flex items-center gap-1">
-            <div className="w-2 h-2 bg-matrix-green rounded-full"></div> LIVE_LINK_ACTIVE
+    <div className="min-h-screen bg-gray-900 text-green-400 p-6 font-mono">
+      <header className="border-b-2 border-green-700 pb-4 flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">DRONE_SEC_ANALYST_V1.0</h1>
+        <div className="text-sm">
+          <span className={`${loading ? 'animate-pulse' : ''} flex items-center gap-2`}>
+            <div className={`w-2 h-2 rounded-full ${loading ? 'bg-yellow-500' : 'bg-green-400'}`}></div>
+            {loading ? 'CONNECTING...' : 'LIVE_LINK_ACTIVE'}
           </span>
         </div>
       </header>
 
-      <main className="grid grid-cols-12 gap-6 mt-6">
-        {/* Left: Telemetry & Video Feed */}
-        <div className="col-span-8 space-y-6">
-          <section className="border border-matrix-darkgreen p-4 bg-matrix-darkgreen/10">
-            <h2 className="text-sm mb-4 border-b border-matrix-darkgreen flex items-center gap-2">
-              <Activity size={16}/> LIVE_TELEMETRY
-            </h2>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-2 border border-matrix-darkgreen bg-black">
-                <p className="text-[10px] text-matrix-lightgreen">ALTITUDE</p>
-                <p className="text-xl">{telemetry?.altitude || "0.0"} M</p>
+      <main className="grid grid-cols-3 gap-6">
+        {/* Left: Telemetry */}
+        <div className="col-span-2 space-y-4">
+          <div className="border-2 border-green-700 p-4 bg-gray-800">
+            <h2 className="text-lg mb-3 border-b border-green-700 pb-2">LIVE_TELEMETRY</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 border border-green-700 bg-black">
+                <p className="text-xs text-green-500">ALTITUDE</p>
+                <p className="text-2xl">{telemetry?.altitude || "0.0"} M</p>
               </div>
-              <div className="p-2 border border-matrix-darkgreen bg-black">
-                <p className="text-[10px] text-matrix-lightgreen">BATTERY</p>
-                <p className="text-xl">{telemetry?.battery || "0"}%</p>
+              <div className="p-3 border border-green-700 bg-black">
+                <p className="text-xs text-green-500">BATTERY</p>
+                <p className="text-2xl">{telemetry?.battery || "0"}%</p>
               </div>
-              <div className="p-2 border border-matrix-darkgreen bg-black">
-                <p className="text-[10px] text-matrix-lightgreen">LOCATION</p>
-                <p className="text-[10px]">{telemetry?.position.lat}, {telemetry?.position.lng}</p>
+              <div className="p-3 border border-green-700 bg-black">
+                <p className="text-xs text-green-500">LOCATION</p>
+                <p className="text-sm">{telemetry?.position?.lat || "0.0"}, {telemetry?.position?.lng || "0.0"}</p>
               </div>
             </div>
-          </section>
+          </div>
 
-          <section className="border border-matrix-darkgreen p-4 bg-black h-64 flex flex-col justify-end">
-             <div className="flex-1 flex items-center justify-center text-matrix-darkgreen">
-                <Drone size={64} className="animate-bounce" />
-             </div>
-             <div className="bg-matrix-darkgreen/20 p-2 text-sm border-l-2 border-matrix-green">
-               <p className="text-xs text-matrix-lightgreen font-bold">[ VLM_DESCRIBER ]:</p>
-               {currentFrame?.description || "AWAITING_FEED..."}
-             </div>
-          </section>
+          <div className="border-2 border-green-700 p-4 bg-black h-64 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-green-500 mb-2">[ VLM_DESCRIBER ]:</p>
+              <p className="text-sm">{currentFrame?.description || "AWAITING_FEED..."}</p>
+            </div>
+          </div>
         </div>
 
         {/* Right: Alerts & Search */}
-        <div className="col-span-4 space-y-6">
-          <section className="border border-matrix-darkgreen p-4 h-64 overflow-y-auto">
-            <h2 className="text-sm border-b border-matrix-darkgreen mb-2 flex items-center gap-2">
-              <AlertTriangle size={16} className="text-red-500" /> THREAT_LOG
-            </h2>
+        <div className="space-y-4">
+          <div className="border-2 border-green-700 p-4 bg-gray-800 h-48 overflow-y-auto">
+            <h2 className="text-lg mb-2 border-b border-green-700 pb-2">THREAT_LOG</h2>
             {alerts.length === 0 ? (
-              <p className="text-xs text-matrix-darkgreen italic mt-4">NO_THREATS_DETECTED</p>
+              <p className="text-xs text-green-700 italic">NO_THREATS_DETECTED</p>
             ) : (
               alerts.map(a => (
-                <div key={a.id} className="text-[10px] mb-2 p-1 border-l border-red-900 bg-red-900/10">
-                  <span className="text-red-500">[{a.time}] ALERT:</span> {a.msg}
+                <div key={a.id} className="text-xs mb-2 p-1 border-l border-red-900 bg-red-900/20">
+                  <span className="text-red-400">[{a.time}]:</span> {a.msg}
                 </div>
               ))
             )}
-          </section>
+          </div>
 
-          <section className="border border-matrix-darkgreen p-4">
-            <h2 className="text-sm border-b border-matrix-darkgreen mb-4 flex items-center gap-2">
-              <Search size={16}/> CROSS_DOMAIN_INDEX
-            </h2>
-            <div className="flex gap-2 mb-4">
+          <div className="border-2 border-green-700 p-4 bg-gray-800">
+            <h2 className="text-lg mb-2 border-b border-green-700 pb-2">SEARCH</h2>
+            <div className="flex gap-2 mb-3">
               <input 
-                className="bg-black border border-matrix-darkgreen p-1 text-xs w-full focus:outline-none focus:border-matrix-green" 
-                placeholder="Search object (e.g. truck)"
+                className="bg-black border border-green-700 p-2 text-xs flex-1 text-green-400 focus:outline-none focus:border-green-400" 
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <button onClick={handleSearch} className="bg-matrix-green text-matrix-black px-2 text-xs font-bold">QUERY</button>
+              <button onClick={handleSearch} className="bg-green-400 text-black px-3 text-xs font-bold">QUERY</button>
             </div>
-            <div className="text-[10px] space-y-2">
+            <div className="text-xs space-y-1">
               {searchResults.map((res, i) => (
-                <div key={i} className="border-b border-matrix-darkgreen pb-1 italic">
-                  - {res}
-                </div>
+                <div key={i} className="border-b border-green-700 pb-1">- {res}</div>
               ))}
             </div>
-          </section>
+          </div>
         </div>
       </main>
     </div>

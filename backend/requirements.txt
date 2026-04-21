@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+langchain
+langchain-openai  # Or langchain-community for local models
+chromadb          # For the indexing/search requirement
+python-dotenv
+pandas
